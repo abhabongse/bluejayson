@@ -1,0 +1,15 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+jupyter = "~=1.0.0"
+sphinx = "~=1.8.4"
+sphinx-rtd-theme = "~=0.4.3"
+
+[packages]
+pyyaml = "~=3.13"
+
+[requires]
+python_version = "3.7"
