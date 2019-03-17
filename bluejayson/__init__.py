@@ -10,7 +10,7 @@ __maintainer__ = "Abhabongse Janthong"
 __email__ = "6845502+abhabongse@users.noreply.github.com"
 __status__ = "Development"
 
-from bluejayson.schemata import BaseSchema
+from bluejayson.schema import BaseSchema
 
 __all__ = [
     'BaseSchema',
