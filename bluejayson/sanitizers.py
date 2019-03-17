@@ -56,7 +56,6 @@ class Sanitizer:
         return self.concat(other, self)
 
 
-
 class SanitizerChain(Sanitizer):
     """
     A chain (or a sequence) of sanitizers resulting by concatenating together two
