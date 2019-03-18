@@ -2,6 +2,7 @@ from collections import OrderedDict
 from inspect import Signature, Parameter
 from typing import Dict
 
+from bluejayson.exceptions import ValidationError
 from bluejayson.fields import BaseField
 
 
@@ -62,11 +63,17 @@ class BaseSchema(metaclass=SchemaMeta):
         cls = type(self)
 
         # TODO: Resolve parameters and field defaults
-        # TODO: Value validations
         for name, value in params.items():
-            if name not in cls.bjs_all_fields:
+            if name not in cls.bjs_all_fields.keys():
                 raise TypeError(f"unknown field {name}")
-            setattr(self, name, value)
+            try:
+                setattr(self, name, value)
+            except ValidationError as e:
+                raise ValidationError(f"field {name}: {e.args[0]}") from e
+
+        # TODO: Value validations (faking it right now)
+        for name in cls.bjs_all_fields.keys():
+            getattr(self, name)
 
     def __repr__(self):
         cls = type(self)
