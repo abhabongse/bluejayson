@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from bluejayson.schema import BaseSchema
 
 
-class _Missing:
+class _Empty:
     pass
 
 
@@ -27,8 +27,9 @@ class BaseField:
             opposite job of parsers: to convert value back into JSON strings
             or JSON-structured objects.
     """
+    empty = _Empty
 
-    def __init__(self, default=_Missing,
+    def __init__(self, default=_Empty,
                  parser: 'Parser' = None, sanitizer: 'Sanitizer' = None,
                  formatter: 'Formatter' = None):
         from bluejayson.formatters import Formatter
@@ -50,7 +51,7 @@ class BaseField:
     def __get__(self, instance: Optional['BaseSchema'], owner: Type['BaseSchema']):
         if instance is None:
             return self
-        if self.field_name not in instance.__dict__ and self.default is not _Missing:
+        if self.field_name not in instance.__dict__ and self.default is not BaseField.empty:
             instance.__dict__[self.field_name] = self.default() if callable(self.default) else self.default
         return instance.__dict__[self.field_name]
 
