@@ -82,8 +82,10 @@ def between(lower_limit, upper_limit, inclusive: bool = True,
         lower_limit: Minimum allowed value
         upper_limit: Maximum allowed value
         inclusive: Whether to include the limits as part of allowed value
-        lower_inclusive: Whether to include the lower limit as part of allowed value (overrides inclusive)
-        upper_inclusive: Whether to include the upper limit as part of allowed value (overrides inclusive)
+        lower_inclusive: Whether to include the lower limit as part of allowed value
+            (overrides inclusive)
+        upper_inclusive: Whether to include the upper limit as part of allowed value
+            (overrides inclusive)
 
     Returns:
         An instance of :py:class:`Validator`.
@@ -95,10 +97,12 @@ def between(lower_limit, upper_limit, inclusive: bool = True,
                          f"must be between {lower_limit!r} and {upper_limit!r} (inclusive)")
     elif lower_inclusive:
         return Validator(lambda value: lower_limit <= value < upper_limit,
-                         f"must be between {lower_limit!r} (inclusive) and {upper_limit!r} (exclusive)")
+                         f"must be between {lower_limit!r} (inclusive) and "
+                         f"{upper_limit!r} (exclusive)")
     elif upper_inclusive:
         return Validator(lambda value: lower_limit < value <= upper_limit,
-                         f"must be between {lower_limit!r} (exclusive) and {upper_limit!r} (inclusive)")
+                         f"must be between {lower_limit!r} (exclusive) and "
+                         f"{upper_limit!r} (inclusive)")
     else:
         return Validator(lambda value: lower_limit < value < upper_limit,
                          f"must be between {lower_limit!r} and {upper_limit!r} (exclusive)")
