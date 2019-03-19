@@ -1,5 +1,7 @@
 # BlueJayson
 
+[![PyPI](https://img.shields.io/pypi/v/BlueJayson.svg?color=blue)](https://pypi.org/project/BlueJayson/)
+
 BlueJayson is a simple Pythonic data definition library to manage very basic data validations and serializations to and from JSON.
 
 **This project is still in development and is not yet production-ready.**
