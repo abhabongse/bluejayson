@@ -8,6 +8,9 @@ jupyter = "~=1.0.0"
 sphinx = "~=1.8.4"
 sphinx-rtd-theme = "~=0.4.3"
 pytest = "~=4.3.1"
+setuptools = "~=40.8.0"
+wheel = "~=0.33.1"
+twine = "~=1.13.0"
 
 [packages]
 pyyaml = "~=5.1"
