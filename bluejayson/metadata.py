@@ -1,5 +1,5 @@
 __author__ = "Abhabongse Janthong"
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 __license__ = "Apache License 2.0"
 __maintainer__ = "Abhabongse Janthong"
 __email__ = "abhabongse@gmail.com"
