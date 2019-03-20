@@ -11,7 +11,7 @@ from setuptools import Command, setup, find_packages
 # Obtain metadata information about the package from the source file itself
 this_dir = os.path.dirname(os.path.abspath(__file__))
 about_ns = {}
-with open(os.path.join(this_dir, "bluejayson", "metadata.py")) as f:
+with open(os.path.join(this_dir, "bluejayson", "__metadata__.py")) as f:
     exec(f.read(), about_ns)
 
 # Basic package information
@@ -23,7 +23,8 @@ LICENSE = about_ns['__license__']
 AUTHOR = about_ns['__author__']
 EMAIL = about_ns['__email__']
 VERSION = about_ns['__version__']
-REQUIRES_PYTHON = '>=3.6.0'
+REQUIRES_PYTHON = ">=3.6.0,<4"
+KEYWORDS = "schema data-definition json"
 
 # What packages are required for this module to be executed?
 REQUIRED = []
@@ -87,6 +88,7 @@ setup(
     author=AUTHOR,
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
+    keywords=KEYWORDS,
     url=URL,
     packages=find_packages(exclude=('tests',)),
     install_requires=REQUIRED,
