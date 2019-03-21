@@ -106,7 +106,7 @@ def between(lower_limit, upper_limit, inclusive: bool = True,
     else:
         return Validator(lambda value: lower_limit < value < upper_limit,
                          f"must be between {lower_limit!r} and {upper_limit!r} (exclusive)")
-    
+
 
 def max_length(limit):
     """
