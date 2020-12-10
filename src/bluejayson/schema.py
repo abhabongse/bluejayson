@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections import OrderedDict
-from inspect import Signature, Parameter
+from inspect import Parameter, Signature
 from typing import Dict
 
 from bluejayson.exceptions import ValidationError

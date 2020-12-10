@@ -1,113 +1,57 @@
 #!/usr/bin/env python3
-# Setting up python packaging
-
 import io
-import os
-import sys
-from shutil import rmtree
+import json
+from glob import glob
+from os.path import basename, dirname, join, splitext
 
-from setuptools import Command, setup, find_packages
-
-# Obtain metadata information about the package from the source file itself
-this_dir = os.path.dirname(os.path.abspath(__file__))
-about_ns = {}
-with open(os.path.join(this_dir, "bluejayson", "__metadata__.py")) as f:
-    exec(f.read(), about_ns)
-
-# Basic package information
-NAME = "BlueJayson"
-DESCRIPTION = ("BlueJayson is a simple Pythonic data definition library to manage "
-               "very basic data validations and serializations to and from JSON.")
-URL = "https://github.com/abhabongse/bluejayson"
-LICENSE = about_ns['__license__']
-AUTHOR = about_ns['__author__']
-EMAIL = about_ns['__email__']
-VERSION = about_ns['__version__']
-REQUIRES_PYTHON = ">=3.6.0,<4"
-KEYWORDS = "schema data-definition json"
-
-# What packages are required for this module to be executed?
-REQUIRED = []
-
-# What packages are optional?
-EXTRAS = {}
-
-# Obtain long description of the project from README.md file
-try:
-    with io.open(os.path.join(this_dir, "README.md"), encoding='utf-8') as f:
-        LONG_DESCRIPTION = '\n' + f.read()
-except FileNotFoundError:
-    LONG_DESCRIPTION = DESCRIPTION
+from setuptools import find_packages, setup
 
 
-# Upload package to PyPI using Twine
-class UploadCommand(Command):
-    """Support setup.py upload."""
-
-    description = "Build and publish the package."
-    user_options = []
-
-    @staticmethod
-    def status(s):
-        """Prints things in bold."""
-        print('\033[1m{0}\033[0m'.format(s))
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        try:
-            self.status('Removing previous builds…')
-            rmtree(os.path.join(this_dir, 'dist'))
-        except OSError:
-            pass
-
-        self.status('Building Source and Wheel (universal) distribution…')
-        os.system('{0} setup.py sdist bdist_wheel'.format(sys.executable))
-
-        self.status('Uploading the package to PyPI via Twine…')
-        os.system('twine upload dist/*')
-
-        self.status('Pushing git tags…')
-        os.system('git tag v{0}'.format(VERSION))
-        os.system('git push --tags')
-
-        sys.exit()
+def read(*names, **kwargs):
+    with io.open(join(dirname(__file__), *names),
+                 encoding=kwargs.get('encoding', 'utf8')) as fh:
+        return fh.read()
 
 
-# Run the package setup
+_METADATA = json.loads(read(join('src', 'bluejayson', 'meta.json')))
+
 setup(
-    name=NAME,
-    version=VERSION,
-    description=DESCRIPTION,
-    long_description=LONG_DESCRIPTION,
+    name='bluejayson',
+    version=_METADATA['version'],
+    license=_METADATA['license'],
+    description=_METADATA['description'],
+    long_description=read('README.md'),
     long_description_content_type='text/markdown',
-    author=AUTHOR,
-    author_email=EMAIL,
-    python_requires=REQUIRES_PYTHON,
-    keywords=KEYWORDS,
-    url=URL,
-    packages=find_packages(exclude=('tests',)),
-    install_requires=REQUIRED,
-    extras_require=EXTRAS,
+    author=_METADATA['author'],
+    author_email=_METADATA['email'],
+    url='https://github.com/abhabongse/bluejayson',
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
+    py_modules=[splitext(basename(path))[0] for path in glob('src/*.py')],
     include_package_data=True,
-    license=LICENSE,
+    zip_safe=False,
     classifiers=[
-        # Trove classifiers
-        # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
-        "Development Status :: 2 - Pre-Alpha",
-        "License :: OSI Approved :: Apache Software License",
-        "Programming Language :: Python",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3 :: Only",
-        "Topic :: Software Development :: Libraries",
+        # Complete classifier list:
+        # http://pypi.python.org/pypi?%3Aaction=list_classifiers
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Topic :: Utilities',
+        'Typing :: Typed',
     ],
-    cmdclass={
-        'upload': UploadCommand,
+    project_urls={
+        'Documentation': 'https://bluejayson.readthedocs.io/',
+        'Changelog': 'https://github.com/abhabongse/bluejayson/blob/main/CHANGELOG.md',
+        'Issue Tracker': 'https://github.com/abhabongse/bluejayson/issues',
     },
+    keywords=[],
+    python_requires='>=3.7',
+    install_requires=[
+        'typing-extensions>=3.7.4',
+    ],
 )

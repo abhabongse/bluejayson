@@ -1,0 +1,11 @@
+{
+  "description": "BlueJayson provides a collection of extra annotation utilities into type annotations in functions, classes, and modules (such as simple data validation).",
+  "version": "0.1.0.dev1",
+  "license": "Apache-2.0",
+  "status": "Beta",
+  "author": "Abhabongse Janthong",
+  "email": "6845502+abhabongse@users.noreply.github.com",
+  "maintainers": [
+    "Abhabongse Janthong"
+  ]
+}

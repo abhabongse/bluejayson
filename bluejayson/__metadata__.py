@@ -1,6 +1,0 @@
-__author__ = "Abhabongse Janthong"
-__version__ = "0.1.0.dev1"
-__license__ = "Apache License 2.0"
-__maintainer__ = "Abhabongse Janthong"
-__email__ = "abhabongse@gmail.com"
-__status__ = "Prototype"

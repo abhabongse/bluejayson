@@ -1,4 +1,6 @@
-from typing import Optional, Callable, Any
+from __future__ import annotations
+
+from typing import Any, Callable, Optional
 
 from bluejayson.exceptions import ValidationError
 from bluejayson.sanitizers import Sanitizer
@@ -12,7 +14,7 @@ class Validator(Sanitizer):
 
     def __init__(self, validate_func: Callable[[Any], bool], description: Optional[str] = None):
         self.validate_func = validate_func
-        self.description = (description or getattr(validate_func, '_description_')
+        self.description = (description or getattr(validate_func, '_description_', None)
                             or f"validation failed on function {validate_func.__qualname__}")
 
     def sanitize(self, value):

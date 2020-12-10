@@ -1,1 +1,12 @@
-include README.md LICENSE
+graft docs
+prune docs/_build
+graft src
+graft tests
+
+include *.md
+include LICENSE
+
+include tox.ini
+exclude Makefile requirements.txt dev-requirements.in dev-requirements.txt
+
+global-exclude *.py[cod] __pycache__/* *.so *.dylib

@@ -1,10 +1,11 @@
-from typing import TYPE_CHECKING, Type, Optional
+from __future__ import annotations
 
-if TYPE_CHECKING:
-    from bluejayson.formatters import Formatter
-    from bluejayson.parsers import Parser
-    from bluejayson.sanitizers import Sanitizer
-    from bluejayson.schema import BaseSchema
+from typing import Optional, Type
+
+from bluejayson.formatters import Formatter
+from bluejayson.parsers import Parser
+from bluejayson.sanitizers import Sanitizer
+from bluejayson.schema import BaseSchema
 
 
 class _Empty:
@@ -29,26 +30,26 @@ class BaseField:
     """
     empty = _Empty
 
-    def __init__(self, default=_Empty,
-                 parser: 'Parser' = None, sanitizer: 'Sanitizer' = None,
-                 formatter: 'Formatter' = None):
-        from bluejayson.formatters import Formatter
-        from bluejayson.parsers import Parser
-        from bluejayson.sanitizers import Sanitizer
-
+    def __init__(
+            self,
+            default=_Empty,
+            parser: Parser = None,
+            sanitizer: Sanitizer = None,
+            formatter: Formatter = None,
+    ):
         self.default = default
         self.parser = parser or Parser()
         self.sanitizer = sanitizer or Sanitizer()
         self.formatter = formatter or Formatter()
 
-    def __set_name__(self, owner: Type['BaseSchema'], name: str):
+    def __set_name__(self, owner: Type[BaseSchema], name: str):
         self.field_name = name
 
-    def __set__(self, instance: 'BaseSchema', value):
+    def __set__(self, instance: BaseSchema, value):
         value = self.sanitizer(value)
         instance.__dict__[self.field_name] = value
 
-    def __get__(self, instance: Optional['BaseSchema'], owner: Type['BaseSchema']):
+    def __get__(self, instance: Optional[BaseSchema], owner: Type[BaseSchema]):
         if instance is None:
             return self
         if self.field_name not in instance.__dict__ and self.default is not BaseField.empty:

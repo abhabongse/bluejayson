@@ -1,4 +1,6 @@
-from typing import Union, List
+from __future__ import annotations
+
+from typing import List, Union
 
 
 class Sanitizer:

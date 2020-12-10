@@ -1,4 +1,6 @@
-from typing import List, Dict
+from __future__ import annotations
+
+from typing import Dict, List
 
 from bluejayson import BaseSchema, fields, validators
 
@@ -6,7 +8,7 @@ from bluejayson import BaseSchema, fields, validators
 class FirstSchema(BaseSchema):
     name: str = fields.StrField(sanitizer=validators.max_length(limit=255))
     age: int = fields.IntField(
-        sanitizer=validators.Validator(lambda x: x >= 0, "must be non-negative")
+        sanitizer=validators.Validator(lambda x: x >= 0, "must be non-negative"),
     )
     married: bool = fields.BoolField(default=True)
     friends: Dict[str, int] = fields.DictField(int)
