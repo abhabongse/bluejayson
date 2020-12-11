@@ -13,7 +13,11 @@ from dataclasses import dataclass
 from typing import Any
 
 
-class BaseValidationException(Exception):
+class ValidationFailed(Exception):
+    """
+    This exception is raised when a validator determines that
+    a given value should be considered invalid data.
+    """
     msg: str
     value: Any
     validator: BaseValidator
@@ -22,21 +26,6 @@ class BaseValidationException(Exception):
         self.msg = msg
         self.value = value
         self.validator = validator
-
-
-class ValidationFailed(BaseValidationException):
-    """
-    Raised when a validator determines that a value should fail the validation.
-    """
-    pass
-
-
-class ImproperValidator(BaseValidationException):
-    """
-    Raised when the validation failed due to validator misconfiguration.
-    """
-    # TODO: remove this exception
-    pass
 
 
 @dataclass
@@ -48,62 +37,54 @@ class BaseValidator(metaclass=ABCMeta):
     @abstractmethod
     def validate_sub(self, value):
         """
-        Checks whether the input value should be considered valid data.
+        Checks whether an input value should be considered valid data.
         This method should return `True` upon the completed and successful check
-        or otherwise raises :exc:`ValidationFailed` if the value has been deemed invalid.
+        or otherwise raises :exc:`ValidationFailed` if the value considered invalid.
 
-        It may also raise :exc:`ValidatorMisconfigured` if the check fails
-        but due to improper configuration on the validator part.
+        Other kinds of exceptions raised from this method
+        should be treated as one of the following:
+        - a validator implementation bug (library's fault)
+        - a bug due to improper validator setup (caller's fault)
 
-        Other kinds of exceptions raised from this method will be treated as
-        a bug in library implementation of validators.
-
-        This method is intended to be a subroutine method
-        amd thus should **not** be called directly;
-        please use :meth:`validate` method or use :meth:`__call__` instead.
+        This method is intended to be called as a subroutine by :meth:`validate` method
+        (or as a callable) and thus should **not** be called directly.
         """
         raise NotImplementedError
 
-    def validate(self, value, *, raises_error: bool = True) -> bool:
+    def validate(self, value) -> bool:
         """
-        Checks the input value through a subroutine call to :meth:`validate_sub`.
-        When `raises_error` flag is **unset** and a validation failure has happened,
-        the :exc:`ValidationFailure` will be replaced with `False` being returned.
+        Checks whether an input value through a subroutine call to :meth:`validate_sub`.
         """
         try:
             result = self.validate_sub(value)
         except ValidationFailed:
-            if raises_error:
-                raise
-            return False
-        except BaseValidationException:
             raise
-        except Exception as exc:
-            raise RuntimeError("unexpected exception from validate_sub") from exc
         if result is not True:
-            raise RuntimeError(f"validate_sub must either return True or raise BaseValidationException "
-                               f"(received {result!r})")
+            raise RuntimeError(f"validate_sub should have returned either True "
+                               f"or raise ValidationFailure (but received {result!r})")
         return True
 
     def __call__(self, value) -> bool:
         """
-        Alias for :meth:`validate` method but strictly returns boolean value
-        instead of raising :exc:`ValidationFailure` upon failure.
+        Alias method for :meth:`validate` method but converts :exc:`ValidationFailure`
+        into returning `False` instead.
         """
-        return self.validate(value, raises_error=False)
+        try:
+            return self.validate(value)
+        except ValidationFailed:
+            return False
 
 
 @dataclass
 class Predicate(BaseValidator):
     """
-    Wraps over a custom predicate function.
+    Wraps over a custom predicate (boolean) function.
     """
     #: Custom predicate function
     custom_func: Callable[[Any], bool]
 
-    #: Whether non-boolean value returned from custom predicate
-    #: should be treated as :exc:`ValidationFailure`
-    #: TODO: incorporate this attribute
+    #: Indicates whether non-boolean value returned from custom predicate
+    #: should be treated as :exc:`TypeError` instead
     strict: bool = True
 
     def __post_init__(self):
@@ -128,9 +109,8 @@ class Predicate(BaseValidator):
 
     def validate_sub(self, value):
         result = self.custom_func(value)
-        if not isinstance(result, bool):
-            raise ImproperValidator(f"custom predicate must return boolean "
-                                    f"(received {result!r})", value, self)
+        if self.strict and not isinstance(result, bool):
+            raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
         if not result:
             raise ValidationFailed("custom predicate is not satisfied", value, self)
         return True
@@ -139,9 +119,9 @@ class Predicate(BaseValidator):
 @dataclass
 class Equal(BaseValidator):
     """
-    Checks whether a value is equal to the given `target`.
+    Checks whether a given value matches (i.e. is equal to) the given `target`.
     """
-    #: Target to compare against
+    #: Target to compare the value against
     target: Any
 
     def validate_sub(self, value):
@@ -153,23 +133,22 @@ class Equal(BaseValidator):
 @dataclass
 class Range(BaseValidator):
     """
-    Checks whether a value falls within the given range.
+    Checks whether a given value falls within a defined bounded range.
     """
-    #: Lower bound of the range to compare (not checked if not provided)
+    #: Lower bound of the range to compare the value against (not checked if not provided)
     min: Any = None
 
-    #: Upper bound of the range to compare (not checked if not provided)
+    #: Upper bound of the range to compare the value against (not checked if not provided)
     max: Any = None
 
-    #: Whether to include `min` as part of the range itself
+    #: Indicating whether to include `min` as part of the range itself
     min_inclusive: bool = True
 
-    #: Whether to include `max` as part of the range itself
+    #: Indicating whether to include `max` as part of the range itself
     max_inclusive: bool = True
 
-    #: Whether :exc:`TypeError` raised during value comparison
-    #: should be treated as :exc:`ValidationFailure`
-    #: TODO: incorporate this attribute
+    #: Whether :exc:`TypeError` raised due to value comparison operation
+    #: should be treated as :exc:`ValidationFailure` instead
     absorb_cmp_error: bool = True
 
     def __post_init__(self):
@@ -181,8 +160,11 @@ class Range(BaseValidator):
     def validate_sub(self, value):
         try:
             result = self._compare_lower(value) and self._compare_upper(value)
-        except Exception as exc:
-            raise ImproperValidator("incomparable value with bounds", value, self) from exc
+        except TypeError:
+            if self.absorb_cmp_error:
+                statement = self._inequality_statement()
+                raise ValidationFailed(f"cannot compare value against the range [{statement}]", value, self)
+            raise
         if not result:
             statement = self._inequality_statement()
             raise ValidationFailed(f"value outside of range [{statement}]", value, self)
