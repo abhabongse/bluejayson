@@ -10,7 +10,7 @@ import inspect
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 
 class ValidationFailed(Exception):
@@ -35,7 +35,7 @@ class BaseValidator(metaclass=ABCMeta):
     """
 
     @abstractmethod
-    def validate_sub(self, value):
+    def validate_sub(self, value) -> Literal[True]:
         """
         Checks whether an input value should be considered valid data.
         This method should return `True` upon the completed and successful check
@@ -107,7 +107,7 @@ class Predicate(BaseValidator):
         if not all(sig.parameters[name].default != inspect.Parameter.empty for name in rest):
             raise TypeError("other arguments after first of the custom predicate must be optional")
 
-    def validate_sub(self, value):
+    def validate_sub(self, value) -> Literal[True]:
         result = self.custom_func(value)
         if self.strict and not isinstance(result, bool):
             raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
@@ -124,7 +124,7 @@ class Equal(BaseValidator):
     #: Target to compare the value against
     target: Any
 
-    def validate_sub(self, value):
+    def validate_sub(self, value) -> Literal[True]:
         if value != self.target:
             raise ValidationFailed(f"value not matching target {self.target!r}", value, self)
         return True
@@ -153,17 +153,17 @@ class Range(BaseValidator):
 
     def __post_init__(self):
         if not isinstance(self.min_inclusive, bool):
-            raise TypeError(f"min_inclusive flag must be a boolean (received {self.min_inclusive!r})")
+            raise TypeError(f"min_inclusive flag must be a boolean (but received {self.min_inclusive!r})")
         if not isinstance(self.max_inclusive, bool):
-            raise TypeError(f"max_inclusive flag must be a boolean (received {self.max_inclusive!r})")
+            raise TypeError(f"max_inclusive flag must be a boolean (but received {self.max_inclusive!r})")
 
-    def validate_sub(self, value):
+    def validate_sub(self, value) -> Literal[True]:
         try:
             result = self._compare_lower(value) and self._compare_upper(value)
-        except TypeError:
+        except TypeError as exc:
             if self.absorb_cmp_error:
                 statement = self._inequality_statement()
-                raise ValidationFailed(f"cannot compare value against the range [{statement}]", value, self)
+                raise ValidationFailed(f"cannot compare value against the range [{statement}]", value, self) from exc
             raise
         if not result:
             statement = self._inequality_statement()
@@ -171,20 +171,10 @@ class Range(BaseValidator):
         return True
 
     def _compare_lower(self, value) -> bool:
-        if self.min is None:
-            return True
-        if self.min_inclusive:
-            return value >= self.min
-        else:
-            return value > self.min
+        return self.min is None or (value >= self.min if self.min_inclusive else value > self.min)
 
     def _compare_upper(self, value) -> bool:
-        if self.max is None:
-            return True
-        if self.max_inclusive:
-            return value <= self.max
-        else:
-            return value < self.max
+        return self.max is None or (value <= self.max if self.max_inclusive else value < self.max)
 
     def _inequality_statement(self) -> str:
         statement = '?'
@@ -194,4 +184,60 @@ class Range(BaseValidator):
         if self.max is not None:
             op = '<=' if self.max_inclusive else '<'
             statement = f'{statement} {op} {self.max}'
+        return statement
+
+
+@dataclass
+class Length(BaseValidator):
+    """
+    Checks whether a given value has the length adhering to the specified bounded range.
+    """
+    #: Lower bound of the range to compare the value against (not checked if not provided)
+    min: int = None
+
+    #: Upper bound of the range to compare the value against (not checked if not provided)
+    max: int = None
+
+    #: The exact expected length of the value
+    #: (ignoring `min` and `max` if this value is specified)
+    equal: int = None
+
+    #: Whether :exc:`TypeError` raised due to computation of length (via `len` function)
+    #: should be treated as :exc:`ValidationFailure` instead
+    absorb_len_error: bool = True
+
+    def __post_init__(self):
+        if self.equal is None:
+            if self.min is not None and not isinstance(self.min, int):
+                raise TypeError(f"min should be int if provided (but received {self.min!r})")
+            if self.max is not None and not isinstance(self.max, int):
+                raise TypeError(f"max should be int if provided (but received {self.max!r})")
+        elif not isinstance(self.equal, int):
+            raise TypeError(f"equal should be int if provided (but received {self.equal!r})")
+
+    def validate_sub(self, value) -> Literal[True]:
+        try:
+            length = len(value)
+        except TypeError as exc:
+            if self.absorb_len_error:
+                raise ValidationFailed("cannot compute length of value", value, self) from exc
+            raise
+        result = self._compare_lower(length) and self._compare_upper(length)
+        if not result:
+            statement = self._inequality_statement()
+            raise ValidationFailed(f"length outside of range [{statement}]", value, self)
+        return True
+
+    def _compare_lower(self, length: int) -> bool:
+        return self.min is None or self.min <= length
+
+    def _compare_upper(self, length: int) -> bool:
+        return self.max is None or length <= self.max
+
+    def _inequality_statement(self) -> str:
+        statement = '?'
+        if self.min is not None:
+            statement = f'{self.min} <= {statement}'
+        if self.max is not None:
+            statement = f'{statement} <= {self.max}'
         return statement
