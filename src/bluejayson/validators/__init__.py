@@ -35,6 +35,7 @@ class ImproperValidator(BaseValidationException):
     """
     Raised when the validation failed due to validator misconfiguration.
     """
+    # TODO: remove this exception
     pass
 
 
@@ -100,6 +101,11 @@ class Predicate(BaseValidator):
     #: Custom predicate function
     custom_func: Callable[[Any], bool]
 
+    #: Whether non-boolean value returned from custom predicate
+    #: should be treated as :exc:`ValidationFailure`
+    #: TODO: incorporate this attribute
+    strict: bool = True
+
     def __post_init__(self):
         self._check_custom_predicate(self.custom_func)
 
@@ -151,12 +157,20 @@ class Range(BaseValidator):
     """
     #: Lower bound of the range to compare (not checked if not provided)
     min: Any = None
+
     #: Upper bound of the range to compare (not checked if not provided)
     max: Any = None
+
     #: Whether to include `min` as part of the range itself
     min_inclusive: bool = True
+
     #: Whether to include `max` as part of the range itself
     max_inclusive: bool = True
+
+    #: Whether :exc:`TypeError` raised during value comparison
+    #: should be treated as :exc:`ValidationFailure`
+    #: TODO: incorporate this attribute
+    absorb_cmp_error: bool = True
 
     def __post_init__(self):
         if not isinstance(self.min_inclusive, bool):
