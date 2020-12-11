@@ -47,7 +47,7 @@ setup(
     project_urls={
         'Documentation': 'https://bluejayson.readthedocs.io/',
         'Changelog': 'https://github.com/abhabongse/bluejayson/blob/main/CHANGELOG.md',
-        'Issue Tracker': 'https://github.com/abhabongse/bluejayson/issues',
+        'Issues': 'https://github.com/abhabongse/bluejayson/issues',
     },
     keywords=[],
     python_requires='>=3.7',

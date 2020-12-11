@@ -7,14 +7,10 @@ from __future__ import annotations
 import json
 import os
 
-from bluejayson.schema import BaseSchema
-
-__all__ = [
-    'BaseSchema',
-]
+__all__ = []
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-metadata_file = os.path.join(this_dir, 'meta.json')
+metadata_file = os.path.join(this_dir, 'legacy/meta.json')
 
 try:
     with open(metadata_file) as fobj:

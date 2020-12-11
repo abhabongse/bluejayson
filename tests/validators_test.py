@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from bluejayson import validators
-from bluejayson.exceptions import ValidationError
+from bluejayson.legacy.exceptions import ValidationError
 
 
 def test_validate_is_exactly():

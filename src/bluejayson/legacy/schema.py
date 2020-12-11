@@ -4,8 +4,8 @@ from collections import OrderedDict
 from inspect import Parameter, Signature
 from typing import Dict
 
-from bluejayson.exceptions import ValidationError
-from bluejayson.fields import BaseField
+from bluejayson.legacy.exceptions import ValidationError
+from bluejayson.legacy.fields import BaseField
 
 
 class SchemaMeta(type):

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, List
 
-from bluejayson import BaseSchema, fields, validators
+from bluejayson import BaseSchema, validators
+from bluejayson.legacy import fields
 
 
 class FirstSchema(BaseSchema):

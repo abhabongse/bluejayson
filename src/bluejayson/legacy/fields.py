@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Optional, Type
 
-from bluejayson.formatters import Formatter
-from bluejayson.parsers import Parser
-from bluejayson.sanitizers import Sanitizer
-from bluejayson.schema import BaseSchema
+from bluejayson.legacy.formatters import Formatter
+from bluejayson.legacy.parsers import Parser
+from bluejayson.legacy.sanitizers import Sanitizer
+from bluejayson.legacy.schema import BaseSchema
 
 
 class _Empty:
@@ -22,7 +22,7 @@ class BaseField:
             JSON strings and JSON-structured objects into intermediate results
             which will then be passed to sanitizers.
         sanitizer: Instance of :py:class:`Sanitizer` class which will help
-            validate and sanitize values (which either already have been parsed
+            validators and sanitize values (which either already have been parsed
             or is provided directory to the constructor).
         formatter: Instance of :py:class:`Formatter` class which does the
             opposite job of parsers: to convert value back into JSON strings

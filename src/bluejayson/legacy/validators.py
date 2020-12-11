@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Optional
 
-from bluejayson.exceptions import ValidationError
-from bluejayson.sanitizers import Sanitizer
+from bluejayson.legacy.exceptions import ValidationError
+from bluejayson.legacy.sanitizers import Sanitizer
 
 
 class Validator(Sanitizer):
