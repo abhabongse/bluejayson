@@ -7,10 +7,11 @@ https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
 from __future__ import annotations
 
 import inspect
+import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 
 class ValidationFailed(Exception):
@@ -18,21 +19,31 @@ class ValidationFailed(Exception):
     This exception is raised when a validator determines that
     a given value should be considered invalid data.
     """
-    msg: str
     value: Any
     validator: BaseValidator
+    error_code: str
 
-    def __init__(self, msg: str, value, validator: BaseValidator):
-        self.msg = msg
+    def __init__(self, value: Any, validator: BaseValidator, error_code: str):
         self.value = value
         self.validator = validator
+        self.error_code = error_code
+
+    def __str__(self):
+        if self.error_code not in self.validator.error_formats:
+            warnings.warn(f"unknown error code: {self.error_code!r} "
+                          f"of {self.validator.__class__.__qualname__}")
+        return (self.validator.error_formats
+                .get(self.error_code, "validation failed")
+                .format(value=self.value, validator=self.validator))
 
 
-@dataclass
 class BaseValidator(metaclass=ABCMeta):
     """
     Base validator class for all kinds of validations.
     """
+    #: Maintains a mapping from error codes (specific to each validator)
+    #: to error messages as {}-formatted strings
+    error_formats: ClassVar[dict[str, str]] = {}
 
     @abstractmethod
     def validate_sub(self, value) -> Literal[True]:
@@ -80,6 +91,10 @@ class Predicate(BaseValidator):
     """
     Wraps over a custom predicate (boolean) function.
     """
+    error_formats = {
+        'not_satisfied': "custom predicate is not satisfied",
+    }
+
     #: Custom predicate function
     custom_func: Callable[[Any], bool]
 
@@ -112,7 +127,7 @@ class Predicate(BaseValidator):
         if self.strict and not isinstance(result, bool):
             raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
         if not result:
-            raise ValidationFailed("custom predicate is not satisfied", value, self)
+            raise ValidationFailed(value, self, 'not_satisfied')
         return True
 
 
@@ -121,12 +136,16 @@ class Equal(BaseValidator):
     """
     Checks whether a given value matches (i.e. is equal to) the given `target`.
     """
+    error_formats = {
+        'not_matched': 'value not matching target {validator.target!r}',
+    }
+
     #: Target to compare the value against
     target: Any
 
     def validate_sub(self, value) -> Literal[True]:
         if value != self.target:
-            raise ValidationFailed(f"value not matching target {self.target!r}", value, self)
+            raise ValidationFailed(value, self, 'not_matched')
         return True
 
 
@@ -135,6 +154,11 @@ class Range(BaseValidator):
     """
     Checks whether a given value falls within a defined bounded range.
     """
+    error_formats = {
+        'incomparable': "cannot compare value against the range [{validator.range_string}]",
+        'out_of_range': "value outside of range [{validator.range_string}]",
+    }
+
     #: Lower bound of the range to compare the value against (not checked if not provided)
     min: Any = None
 
@@ -162,12 +186,10 @@ class Range(BaseValidator):
             result = self._compare_lower(value) and self._compare_upper(value)
         except TypeError as exc:
             if self.absorb_cmp_error:
-                statement = self._inequality_statement()
-                raise ValidationFailed(f"cannot compare value against the range [{statement}]", value, self) from exc
+                raise ValidationFailed(value, self, 'incomparable') from exc
             raise
         if not result:
-            statement = self._inequality_statement()
-            raise ValidationFailed(f"value outside of range [{statement}]", value, self)
+            raise ValidationFailed(value, self, 'out_of_range')
         return True
 
     def _compare_lower(self, value) -> bool:
@@ -176,7 +198,8 @@ class Range(BaseValidator):
     def _compare_upper(self, value) -> bool:
         return self.max is None or (value <= self.max if self.max_inclusive else value < self.max)
 
-    def _inequality_statement(self) -> str:
+    @property
+    def range_string(self) -> str:
         statement = '?'
         if self.min is not None:
             op = '<=' if self.min_inclusive else '<'
@@ -192,6 +215,11 @@ class Length(BaseValidator):
     """
     Checks whether a given value has the length adhering to the specified bounded range.
     """
+    error_formats = {
+        'uncomputable_length': "cannot compute length of value",
+        'length_out_of_range': "length outside of range [{validator.range_string}]",
+    }
+
     #: Lower bound of the range to compare the value against (not checked if not provided)
     min: int = None
 
@@ -220,12 +248,11 @@ class Length(BaseValidator):
             length = len(value)
         except TypeError as exc:
             if self.absorb_len_error:
-                raise ValidationFailed("cannot compute length of value", value, self) from exc
+                raise ValidationFailed(value, self, 'uncomputable_length') from exc
             raise
         result = self._compare_lower(length) and self._compare_upper(length)
         if not result:
-            statement = self._inequality_statement()
-            raise ValidationFailed(f"length outside of range [{statement}]", value, self)
+            raise ValidationFailed(value, self, 'length_out_of_range')
         return True
 
     def _compare_lower(self, length: int) -> bool:
@@ -234,7 +261,8 @@ class Length(BaseValidator):
     def _compare_upper(self, length: int) -> bool:
         return self.max is None or length <= self.max
 
-    def _inequality_statement(self) -> str:
+    @property
+    def range_string(self) -> str:
         statement = '?'
         if self.min is not None:
             statement = f'{self.min} <= {statement}'
