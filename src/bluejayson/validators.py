@@ -7,11 +7,12 @@ https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
 from __future__ import annotations
 
 import inspect
+import re
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, Union
 
 
 class ValidationFailed(Exception):
@@ -29,10 +30,10 @@ class ValidationFailed(Exception):
         self.error_code = error_code
 
     def __str__(self):
-        if self.error_code not in self.validator.error_formats:
+        if self.error_code not in self.validator.error_templates:
             warnings.warn(f"unknown error code: {self.error_code!r} "
                           f"of {self.validator.__class__.__qualname__}")
-        return (self.validator.error_formats
+        return (self.validator.error_templates
                 .get(self.error_code, "validation failed")
                 .format(value=self.value, validator=self.validator))
 
@@ -42,8 +43,8 @@ class BaseValidator(metaclass=ABCMeta):
     Base validator class for all kinds of validations.
     """
     #: Maintains a mapping from error codes (specific to each validator)
-    #: to error messages as {}-formatted strings
-    error_formats: ClassVar[dict[str, str]] = {}
+    #: to error message templates as {}-formatted strings
+    error_templates: ClassVar[dict[str, str]] = {}
 
     @abstractmethod
     def validate_sub(self, value) -> Literal[True]:
@@ -91,7 +92,7 @@ class Predicate(BaseValidator):
     """
     Wraps over a custom predicate (boolean) function.
     """
-    error_formats = {
+    error_templates = {
         'not_satisfied': "custom predicate is not satisfied",
     }
 
@@ -136,7 +137,7 @@ class Equal(BaseValidator):
     """
     Checks whether a given value matches (i.e. is equal to) the given `target`.
     """
-    error_formats = {
+    error_templates = {
         'not_matched': 'value not matching target {validator.target!r}',
     }
 
@@ -154,7 +155,7 @@ class Range(BaseValidator):
     """
     Checks whether a given value falls within a defined bounded range.
     """
-    error_formats = {
+    error_templates = {
         'incomparable': "cannot compare value against the range [{validator.range_string}]",
         'out_of_range': "value outside of range [{validator.range_string}]",
     }
@@ -215,7 +216,7 @@ class Length(BaseValidator):
     """
     Checks whether a given value has the length adhering to the specified bounded range.
     """
-    error_formats = {
+    error_templates = {
         'uncomputable_length': "cannot compute length of value",
         'length_out_of_range': "length outside of range [{validator.range_string}]",
     }
@@ -269,3 +270,27 @@ class Length(BaseValidator):
         if self.max is not None:
             statement = f'{statement} <= {self.max}'
         return statement
+
+
+@dataclass(init=False)
+class Regexp(BaseValidator):
+    """
+    Checks whether a given string value fully matches the given regular expression.
+    """
+    error_templates = {}
+
+    #: Regular expression pattern
+    pattern: re.Pattern[str]
+
+    def __init__(self, pattern: Union[str, re.Pattern[str]]):
+        if isinstance(pattern, re.Pattern):
+            self.pattern = pattern
+        elif isinstance(pattern, str):
+            self.pattern = re.compile(pattern)
+        else:
+            raise TypeError(f"regexp pattern should be a string or a compiled pattern "
+                            f"(but received {pattern!r}")
+
+    def validate_sub(self, value) -> Literal[True]:
+        # TODO: implement this
+        raise NotImplementedError
