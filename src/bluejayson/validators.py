@@ -104,7 +104,7 @@ class BaseValidator(metaclass=ABCMeta):
             return False
 
 
-@dataclass
+@dataclass(order=False)
 class Predicate(BaseValidator):
     """
     Wraps over a custom predicate (boolean) function.
@@ -151,7 +151,7 @@ class Predicate(BaseValidator):
         return True
 
 
-@dataclass
+@dataclass(order=False)
 class Equal(BaseValidator):
     """
     Checks whether a given value matches (i.e. is equal to) the given `target`.
@@ -169,7 +169,7 @@ class Equal(BaseValidator):
         return True
 
 
-@dataclass
+@dataclass(order=False)
 class Range(BaseValidator):
     """
     Checks whether a given value falls within a defined bounded range.
@@ -230,7 +230,7 @@ class Range(BaseValidator):
         return statement
 
 
-@dataclass
+@dataclass(order=False)
 class Length(BaseValidator):
     """
     Checks whether a given value has the length adhering to the specified bounded range.
@@ -291,7 +291,7 @@ class Length(BaseValidator):
         return statement
 
 
-@dataclass(init=False)
+@dataclass(init=False, order=False)
 class Regexp(BaseValidator):
     """
     Checks whether a given string value fully matches the given regular expression.
@@ -348,7 +348,7 @@ class Regexp(BaseValidator):
         return True
 
 
-@dataclass(init=False)
+@dataclass(init=False, order=False)
 class InChoices(BaseValidator):
     """
     Checks whether a given value is one among the pre-defined choices.
