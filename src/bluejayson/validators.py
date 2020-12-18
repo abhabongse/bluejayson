@@ -11,7 +11,7 @@ import re
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field
 from typing import Any, ClassVar, Literal, Union
 
 
@@ -35,7 +35,7 @@ class ValidationFailed(Exception):
                           f"of {self.validator.__class__.__qualname__}")
         return (self.validator.error_templates
                 .get(self.error_code, "validation failed")
-                .format(value=self.value, validator=self.validator))
+                .format(value=self.value, self=self.validator))
 
 
 class BaseValidator(metaclass=ABCMeta):
@@ -93,38 +93,40 @@ class Predicate(BaseValidator):
     Wraps over a custom predicate (boolean) function.
     """
     error_templates = {
-        'not_satisfied': "custom predicate is not satisfied",
+        'not_satisfied': "custom validation function is not satisfied",
     }
 
     #: Custom predicate function
-    custom_func: Callable[[Any], bool]
+    validate_func: Callable[[Any], bool]
 
     #: Indicates whether non-boolean value returned from custom predicate
     #: should be treated as :exc:`TypeError` instead
     strict: bool = True
 
     def __post_init__(self):
-        self._check_custom_predicate(self.custom_func)
+        self._check_validate_func(self.validate_func)
 
     @classmethod
-    def _check_custom_predicate(cls, validate_func):
-        sig = inspect.signature(validate_func)
+    def _check_validate_func(cls, func):
+        sig = inspect.signature(func)
         if not sig.parameters:
             raise TypeError("custom predicate must accept at least one argument")
-        first, *rest = sig.parameters.keys()
+        first_param, *rest_params = sig.parameters.values()
 
-        if sig.parameters[first].kind not in [
+        if first_param.kind not in [
             inspect.Parameter.POSITIONAL_ONLY,
             inspect.Parameter.POSITIONAL_OR_KEYWORD,
             inspect.Parameter.VAR_POSITIONAL,
         ]:
             raise TypeError("first argument of the custom predicate must be accepted positionally")
 
-        if not all(sig.parameters[name].default != inspect.Parameter.empty for name in rest):
-            raise TypeError("other arguments after first of the custom predicate must be optional")
+        for param in rest_params:
+            if (param.kind not in [inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD]
+                    and param.default == inspect.Parameter.empty):
+                raise TypeError("other arguments after first of the custom predicate must be optional")
 
     def validate_sub(self, value) -> Literal[True]:
-        result = self.custom_func(value)
+        result = self.validate_func(value)
         if self.strict and not isinstance(result, bool):
             raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
         if not result:
@@ -138,7 +140,7 @@ class Equal(BaseValidator):
     Checks whether a given value matches (i.e. is equal to) the given `target`.
     """
     error_templates = {
-        'not_matched': 'value not matching target {validator.target!r}',
+        'not_matched': 'value not matching target {self.target!r}',
     }
 
     #: Target to compare the value against
@@ -156,8 +158,8 @@ class Range(BaseValidator):
     Checks whether a given value falls within a defined bounded range.
     """
     error_templates = {
-        'incomparable': "cannot compare value against the range [{validator.range_string}]",
-        'out_of_range': "value outside of range [{validator.range_string}]",
+        'incomparable': "cannot compare value against the range [{self.range_string}]",
+        'out_of_range': "value outside of range [{self.range_string}]",
     }
 
     #: Lower bound of the range to compare the value against (not checked if not provided)
@@ -218,7 +220,7 @@ class Length(BaseValidator):
     """
     error_templates = {
         'uncomputable_length': "cannot compute length of value",
-        'length_out_of_range': "length outside of range [{validator.range_string}]",
+        'length_out_of_range': "length outside of range [{self.range_string}]",
     }
 
     #: Lower bound of the range to compare the value against (not checked if not provided)
@@ -272,25 +274,52 @@ class Length(BaseValidator):
         return statement
 
 
-@dataclass(init=False)
+@dataclass
 class Regexp(BaseValidator):
     """
     Checks whether a given string value fully matches the given regular expression.
     """
-    error_templates = {}
+    error_templates = {
+        'not_string': "value must be a string",
+        'not_matched': "value does not match the regexp pattern: {self.compiled_pattern.pattern}",
+        'not_satisfied': "custom validation function is not satisfied",
+    }
 
-    #: Regular expression pattern
-    pattern: re.Pattern[str]
+    #: Input regular expression pattern
+    pattern: InitVar[Union[str, re.Pattern[str]]]
 
-    def __init__(self, pattern: Union[str, re.Pattern[str]]):
+    #: Compiled regular expression pattern
+    compiled_pattern: re.Pattern[str] = field(init=False)
+
+    #: Post validate function based on match object
+    validate_func: Callable[[re.Match], bool] = None
+
+    #: Indicates whether non-boolean value returned from custom predicate
+    #: should be treated as :exc:`TypeError` instead
+    strict: bool = True
+
+    def __post_init__(self, pattern: Union[str, re.Pattern[str]]):
+        self.compiled_pattern = self._compile_pattern(pattern)
+
+    @classmethod
+    def _compile_pattern(cls, pattern: Union[str, re.Pattern[str]]):
         if isinstance(pattern, re.Pattern):
-            self.pattern = pattern
-        elif isinstance(pattern, str):
-            self.pattern = re.compile(pattern)
-        else:
-            raise TypeError(f"regexp pattern should be a string or a compiled pattern "
-                            f"(but received {pattern!r}")
+            return pattern
+        if isinstance(pattern, str):
+            return re.compile(pattern)
+        raise TypeError(f"regexp pattern should be a string or a compiled pattern (but received {pattern!r}")
 
     def validate_sub(self, value) -> Literal[True]:
-        # TODO: implement this
-        raise NotImplementedError
+        if not isinstance(value, str):
+            raise ValidationFailed(value, self, 'not_string')
+        matchobj = self.compiled_pattern.fullmatch(value)
+        if matchobj is None:
+            raise ValidationFailed(value, self, 'not_matched')
+        if self.validate_func:
+            #: TODO: implements various validation function calling mode
+            result = self.validate_func(matchobj)
+            if self.strict and not isinstance(result, bool):
+                raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
+            if not result:
+                raise ValidationFailed(value, self, 'not_satisfied')
+        return True
