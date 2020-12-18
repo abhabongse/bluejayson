@@ -42,6 +42,9 @@ class BaseValidator(metaclass=ABCMeta):
     """
     Base validator class for all kinds of validations.
     """
+    # TODO: implements boolean-like operators (NOT, AND, OR, XOR)
+    #       to combine multiple sub-validators
+
     #: Maintains a mapping from error codes (specific to each validator)
     #: to error message templates as {}-formatted strings
     error_templates: ClassVar[dict[str, str]] = {}
@@ -294,6 +297,11 @@ class Regexp(BaseValidator):
     #: Post validate function based on match object
     validate_func: Callable[[re.Match], bool] = None
 
+    # TODO: implements various calling mode of validation function
+    #       (e.g. specifying positional/keyword arguments to function instead of matchobj)
+    # TODO: implements validation with recursive Product type
+    #       (requires Product type to be implemented first)
+
     #: Indicates whether non-boolean value returned from custom predicate
     #: should be treated as :exc:`TypeError` instead
     strict: bool = True
@@ -316,10 +324,14 @@ class Regexp(BaseValidator):
         if matchobj is None:
             raise ValidationFailed(value, self, 'not_matched')
         if self.validate_func:
-            #: TODO: implements various validation function calling mode
             result = self.validate_func(matchobj)
             if self.strict and not isinstance(result, bool):
                 raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
             if not result:
                 raise ValidationFailed(value, self, 'not_satisfied')
         return True
+
+# TODO: implements Choices validator
+# TODO: implements Sequence validator which wraps over sub-validator for homogeneous sequence
+# TODO: implements Mapping validator with recursive Product type
+#       (requires Product type to be implemented first)
