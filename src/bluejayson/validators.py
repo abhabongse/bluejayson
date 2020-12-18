@@ -7,12 +7,26 @@ https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
 from __future__ import annotations
 
 import inspect
+import operator
 import re
 import warnings
 from abc import ABCMeta, abstractmethod
-from collections.abc import Callable
-from dataclasses import InitVar, dataclass, field
-from typing import Any, ClassVar, Literal, Union
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from typing import Any, ClassVar, Union
+
+from typing_extensions import Literal
+
+__all__ = [
+    'ValidationFailed',
+    'BaseValidator',
+    'Predicate',
+    'Equal',
+    'Range',
+    'Length',
+    'Regexp',
+    'InChoices',
+]
 
 
 class ValidationFailed(Exception):
@@ -100,14 +114,14 @@ class Predicate(BaseValidator):
     }
 
     #: Custom predicate function
-    validate_func: Callable[[Any], bool]
+    pred: Callable[[Any], bool]
 
-    #: Indicates whether non-boolean value returned from custom predicate
+    #: Indicates whether non-boolean value returned from the predicate function
     #: should be treated as :exc:`TypeError` instead
     strict: bool = True
 
     def __post_init__(self):
-        self._check_validate_func(self.validate_func)
+        self._check_validate_func(self.pred)
 
     @classmethod
     def _check_validate_func(cls, func):
@@ -129,9 +143,9 @@ class Predicate(BaseValidator):
                 raise TypeError("other arguments after first of the custom predicate must be optional")
 
     def validate_sub(self, value) -> Literal[True]:
-        result = self.validate_func(value)
+        result = self.pred(value)
         if self.strict and not isinstance(result, bool):
-            raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
+            raise TypeError(f"predicate must return boolean in strict mode (but received {result!r})")
         if not result:
             raise ValidationFailed(value, self, 'not_satisfied')
         return True
@@ -277,37 +291,38 @@ class Length(BaseValidator):
         return statement
 
 
-@dataclass
+@dataclass(init=False)
 class Regexp(BaseValidator):
     """
     Checks whether a given string value fully matches the given regular expression.
     """
     error_templates = {
         'not_string': "value must be a string",
-        'not_matched': "value does not match the regexp pattern: {self.compiled_pattern.pattern}",
+        'not_matched': "value does not match the regexp pattern: {self.pattern.pattern}",
         'not_satisfied': "custom validation function is not satisfied",
     }
 
     #: Input regular expression pattern
-    pattern: InitVar[Union[str, re.Pattern[str]]]
-
-    #: Compiled regular expression pattern
-    compiled_pattern: re.Pattern[str] = field(init=False)
+    pattern: Union[str, re.Pattern[str]]
 
     #: Post validate function based on match object
-    validate_func: Callable[[re.Match], bool] = None
+    post_validate: Callable[[re.Match], bool]
 
     # TODO: implements various calling mode of validation function
     #       (e.g. specifying positional/keyword arguments to function instead of matchobj)
     # TODO: implements validation with recursive Product type
     #       (requires Product type to be implemented first)
 
-    #: Indicates whether non-boolean value returned from custom predicate
+    #: Indicates whether non-boolean value returned from the post validation function
     #: should be treated as :exc:`TypeError` instead
-    strict: bool = True
+    strict: bool
 
-    def __post_init__(self, pattern: Union[str, re.Pattern[str]]):
-        self.compiled_pattern = self._compile_pattern(pattern)
+    def __init__(self, pattern: Union[str, re.Pattern[str]],
+                 validate_func: Callable[[re.Match], bool] = None,
+                 strict: bool = True):
+        self.pattern = self._compile_pattern(pattern)
+        self.post_validate = validate_func
+        self.strict = strict
 
     @classmethod
     def _compile_pattern(cls, pattern: Union[str, re.Pattern[str]]):
@@ -320,18 +335,55 @@ class Regexp(BaseValidator):
     def validate_sub(self, value) -> Literal[True]:
         if not isinstance(value, str):
             raise ValidationFailed(value, self, 'not_string')
-        matchobj = self.compiled_pattern.fullmatch(value)
+        matchobj = self.pattern.fullmatch(value)
         if matchobj is None:
             raise ValidationFailed(value, self, 'not_matched')
-        if self.validate_func:
-            result = self.validate_func(matchobj)
+        if self.post_validate:
+            result = self.post_validate(matchobj)
             if self.strict and not isinstance(result, bool):
-                raise TypeError(f"custom predicate must return boolean in strict mode (but received {result!r})")
+                raise TypeError(f"post validation function must return boolean in strict mode "
+                                f"(but received {result!r})")
             if not result:
                 raise ValidationFailed(value, self, 'not_satisfied')
         return True
 
-# TODO: implements Choices validator
+
+@dataclass(init=False)
+class InChoices(BaseValidator):
+    """
+    Checks whether a given value is one among the pre-defined choices.
+    """
+    error_templates = {
+        'not_found': "value not found in choices",
+    }
+
+    #: List of choices
+    choices: list[Any]
+
+    #: Compare operation
+    compare: Callable[[Any, Any], bool]
+
+    #: Indicates whether non-boolean value returned from the post validation function
+    #: should be treated as :exc:`TypeError` instead
+    strict: bool
+
+    def __init__(self, choices: Sequence[Any],
+                 compare: Callable[[Any, Any], bool] = operator.eq,
+                 strict: bool = True):
+        self.choices = list(choices)
+        self.compare = compare
+        self.strict = strict
+
+    def validate_sub(self, value) -> Literal[True]:
+        for choice in self.choices:
+            result = self.compare(value, choice)
+            if self.strict and not isinstance(result, bool):
+                raise TypeError(f"compare function must return boolean in strict mode "
+                                f"(but received {result!r})")
+            if result:
+                return True
+        raise ValidationFailed(value, self, 'not_found')
+
 # TODO: implements Sequence validator which wraps over sub-validator for homogeneous sequence
 # TODO: implements Mapping validator with recursive Product type
 #       (requires Product type to be implemented first)
