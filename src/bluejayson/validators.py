@@ -260,8 +260,11 @@ class Length(BaseValidator):
                 raise TypeError(f"min should be int if provided (but received {self.min!r})")
             if self.max is not None and not isinstance(self.max, int):
                 raise TypeError(f"max should be int if provided (but received {self.max!r})")
-        elif not isinstance(self.equal, int):
-            raise TypeError(f"equal should be int if provided (but received {self.equal!r})")
+        else:
+            if self.min is not None or self.max is not None:
+                raise ValueError("min or max should not be provided when equal is provided")
+            if not isinstance(self.equal, int):
+                raise TypeError(f"equal should be int if provided (but received {self.equal!r})")
 
     def validate_sub(self, value) -> Literal[True]:
         try:
@@ -270,7 +273,9 @@ class Length(BaseValidator):
             if self.absorb_len_error:
                 raise ValidationFailed(value, self, 'uncomputable_length') from exc
             raise
-        result = self._compare_lower(length) and self._compare_upper(length)
+        result = (self._compare_exact(length)
+                  and self._compare_lower(length)
+                  and self._compare_upper(length))
         if not result:
             raise ValidationFailed(value, self, 'length_out_of_range')
         return True
@@ -280,6 +285,9 @@ class Length(BaseValidator):
 
     def _compare_upper(self, length: int) -> bool:
         return self.max is None or length <= self.max
+
+    def _compare_exact(self, length: int) -> bool:
+        return self.equal is None or length == self.equal
 
     @property
     def range_string(self) -> str:
