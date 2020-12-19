@@ -23,3 +23,8 @@ __version__ = metadata.get('version')
 __status__ = metadata.get('status')
 __license__ = metadata.get('license')
 __maintainers__ = metadata.get('maintainers')
+
+# TODO: implements ProductType class with proper constructors and inheritance
+# TODO: implements Attribute data descriptor with coerce option
+#       (False, True, other coerce functions)
+# TODO: implements Attribute data descriptor with default option

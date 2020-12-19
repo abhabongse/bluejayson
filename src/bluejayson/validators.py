@@ -310,8 +310,8 @@ class Regexp(BaseValidator):
 
     # TODO: implements various calling mode of validation function
     #       (e.g. specifying positional/keyword arguments to function instead of matchobj)
-    # TODO: implements validation with recursive Product type
-    #       (requires Product type to be implemented first)
+    # TODO: implements validation with recursive ProductType
+    #       (requires ProductType to be implemented first)
 
     #: Indicates whether non-boolean value returned from the post validation function
     #: should be treated as :exc:`TypeError` instead
@@ -385,5 +385,5 @@ class InChoices(BaseValidator):
         raise ValidationFailed(value, self, 'not_found')
 
 # TODO: implements Sequence validator which wraps over sub-validator for homogeneous sequence
-# TODO: implements Mapping validator with recursive Product type
-#       (requires Product type to be implemented first)
+# TODO: implements Mapping validator with recursive ProductType
+#       (requires ProductType to be implemented first)
