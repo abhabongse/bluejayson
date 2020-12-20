@@ -6,7 +6,6 @@ https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
 """
 from __future__ import annotations
 
-import inspect
 import operator
 import re
 import warnings
@@ -114,33 +113,11 @@ class Predicate(BaseValidator):
     }
 
     #: Custom predicate function
-    pred: Callable[[Any], bool]
+    pred: Callable[..., bool]
 
     #: Indicates whether non-boolean value returned from the predicate function
     #: should be treated as :exc:`TypeError` instead
     strict: bool = True
-
-    def __post_init__(self):
-        self._check_validate_func(self.pred)
-
-    @classmethod
-    def _check_validate_func(cls, func):
-        sig = inspect.signature(func)
-        if not sig.parameters:
-            raise TypeError("custom predicate must accept at least one argument")
-        first_param, *rest_params = sig.parameters.values()
-
-        if first_param.kind not in [
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            inspect.Parameter.VAR_POSITIONAL,
-        ]:
-            raise TypeError("first argument of the custom predicate must be accepted positionally")
-
-        for param in rest_params:
-            if (param.kind not in [inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD]
-                    and param.default == inspect.Parameter.empty):
-                raise TypeError("other arguments after first of the custom predicate must be optional")
 
     def validate_sub(self, value) -> Literal[True]:
         result = self.pred(value)
@@ -314,7 +291,7 @@ class Regexp(BaseValidator):
     pattern: Union[str, re.Pattern[str]]
 
     #: Post validate function based on match object
-    post_validate: Callable[[re.Match], bool]
+    post_validate: Callable[..., bool]
 
     # TODO: implements various calling mode of validation function
     #       (e.g. specifying positional/keyword arguments to function instead of matchobj)

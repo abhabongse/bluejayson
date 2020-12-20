@@ -84,8 +84,6 @@ def test_validator_failed(validator, value, error_code):
 
 
 @pytest.mark.parametrize("validator_constructor,exc_cls", [
-    (lambda: Predicate(lambda: None), TypeError),
-    (lambda: Predicate(lambda _x, _y: None), TypeError),
     (lambda: Range(min=0, min_inclusive=1), TypeError),
     (lambda: Range(max=100, max_inclusive=0), TypeError),
     (lambda: Length(min=(5, 10)), TypeError),
@@ -102,14 +100,17 @@ def test_validator_setup_error(validator_constructor, exc_cls):
 
 
 @pytest.mark.parametrize("validator,value,exc_cls", [
-    (Predicate(lambda x: x >= 0), "hello", TypeError),
-    (Predicate(lambda x: x), "hello", TypeError),
+    (Predicate(lambda: True), "hello", TypeError),
+    (Predicate(lambda _x, _y: True), "hi", TypeError),
+    (Predicate(lambda *, _: True), "hello again", TypeError),
+    (Predicate(lambda x: x >= 0), "hello 123", TypeError),
+    (Predicate(lambda x: x), "hello 456", TypeError),
     (Range(min=-12, max=-6, absorb_cmp_error=False), "colony", TypeError),
     (Range(min=(1,), absorb_cmp_error=False), 2, TypeError),
     (Length(min=6, max=19, absorb_len_error=False), 12, TypeError),
     (Regexp(r'(\w+)', validate_func="maybe"), 'cool', TypeError),
-    (Regexp(r'(\w+)', validate_func=lambda: True), 'cool', TypeError),
-    (Regexp(r'(\w+)', validate_func=lambda _: "yes"), 'cool', TypeError),
+    (Regexp(r'(\w+)', validate_func=lambda: True), 'cooler', TypeError),
+    (Regexp(r'(\w+)', validate_func=lambda _: "yes"), 'coolest', TypeError),
 ])
 def test_validator_runtime_error(validator, value, exc_cls):
     with pytest.raises(exc_cls):
