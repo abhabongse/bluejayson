@@ -347,7 +347,7 @@ class Regexp(BaseValidator):
         if matchobj is None:
             raise ValidationFailed(value, self, 'not_matched')
         if self.post_validate:
-            result = self.post_validate(matchobj)
+            result = self.post_validate(*matchobj.groups())
             if self.strict and not isinstance(result, bool):
                 raise TypeError(f"post validation function must return boolean in strict mode "
                                 f"(but received {result!r})")

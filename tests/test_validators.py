@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
+
 import pytest  # noqa
 
-from bluejayson.validators import Equal, Length, Predicate, Range, ValidationFailed
+from bluejayson.validators import Equal, Length, Predicate, Range, Regexp, ValidationFailed
 
 
 @pytest.mark.parametrize("validator,value", [
@@ -29,6 +31,13 @@ from bluejayson.validators import Equal, Length, Predicate, Range, ValidationFai
     (Length(max=7), []),
     (Length(equal=4), "good"),
     (Length(min=7, max=8), "article"),
+    (Regexp(r'\w+|\d'), "abc"),
+    (Regexp(r'\w+|\d'), "0"),
+    (Regexp(re.compile(r'\w+|\d')), "xyz"),
+    (Regexp(re.compile(r'\w+|\d')), "7"),
+    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), "1234:567"),
+    (Regexp(re.compile(r'\w(\w*)\w'), validate_func=lambda s: s == "bcdef"), "abcdefg"),
+    (Regexp(r'(\w+)', validate_func=lambda x: x, strict=False), "foxes"),
 ])
 def test_validator_pass(validator, value):
     assert validator.validate(value)
@@ -59,6 +68,13 @@ def test_validator_pass(validator, value):
     (Length(equal=4), "not ok", 'length_out_of_range'),
     (Length(min=7, max=8), "data", 'length_out_of_range'),
     (Length(min=7, max=8), "data anomaly", 'length_out_of_range'),
+    (Regexp(r'\w+|\d'), 0, 'not_string'),
+    (Regexp(r'\w+|\d'), "no more tests", 'not_matched'),
+    (Regexp(re.compile(r'\w+|\d')), -789, 'not_string'),
+    (Regexp(re.compile(r'\w+|\d')), "cool beans", 'not_matched'),
+    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), 1234567, 'not_string'),
+    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), "1234567", 'not_matched'),
+    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), "123:4567", 'not_satisfied'),
 ])
 def test_validator_failed(validator, value, error_code):
     with pytest.raises(ValidationFailed) as exc_info:
@@ -77,6 +93,8 @@ def test_validator_failed(validator, value, error_code):
     (lambda: Length(equal=[]), TypeError),
     (lambda: Length(min=0, equal=0), ValueError),
     (lambda: Length(max=20, equal=3), ValueError),
+    (lambda: Regexp(1), TypeError),
+    (lambda: Regexp('('), re.error),
 ])
 def test_validator_setup_error(validator_constructor, exc_cls):
     with pytest.raises(exc_cls):
@@ -89,6 +107,9 @@ def test_validator_setup_error(validator_constructor, exc_cls):
     (Range(min=-12, max=-6, absorb_cmp_error=False), "colony", TypeError),
     (Range(min=(1,), absorb_cmp_error=False), 2, TypeError),
     (Length(min=6, max=19, absorb_len_error=False), 12, TypeError),
+    (Regexp(r'(\w+)', validate_func="maybe"), 'cool', TypeError),
+    (Regexp(r'(\w+)', validate_func=lambda: True), 'cool', TypeError),
+    (Regexp(r'(\w+)', validate_func=lambda _: "yes"), 'cool', TypeError),
 ])
 def test_validator_runtime_error(validator, value, exc_cls):
     with pytest.raises(exc_cls):
