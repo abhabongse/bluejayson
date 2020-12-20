@@ -5,17 +5,19 @@ import re
 
 import pytest  # noqa
 
-from bluejayson.validators import Equal, InChoices, Length, Predicate, Range, Regexp, ValidationFailed
+from bluejayson.validators import InChoices, Length, Match, Predicate, Range, Regexp, ValidationFailed
 
 
 @pytest.mark.parametrize("validator,value", [
     (Predicate(lambda x: x >= 0), 3),
     (Predicate(lambda x: x, strict=False), "hello"),
     (Predicate(lambda x: x == "cool"), "cool"),
-    (Equal(10), 10),
-    (Equal(0j), 0.00),
-    (Equal("none"), "none"),
-    (Equal({0, 1, 2}), {n % 3 for n in range(10)}),
+    (Match(10), 10),
+    (Match(0j), 0.00),
+    (Match("none"), "none"),
+    (Match(math.pi, compare=math.isclose), 3.141592653589),
+    (Match(math.pi, compare=lambda x, y: 'yes' if math.isclose(x, y) else '', strict=False), 3.141592653589),
+    (Match({0, 1, 2}), {n % 3 for n in range(10)}),
     (Range(min=7), 10),
     (Range(max=-3), -5),
     (Range(min=-12, max=-6), -10),
@@ -54,10 +56,11 @@ def test_validator_pass(validator, value):
     (Predicate(lambda x: x >= 0), -2, 'not_satisfied'),
     (Predicate(lambda x: x, strict=False), 0, 'not_satisfied'),
     (Predicate(lambda x: x == "cool"), 300, 'not_satisfied'),
-    (Equal(10), -10, 'not_matched'),
-    (Equal(0j), 1.e-100, 'not_matched'),
-    (Equal(float("nan")), float("nan"), 'not_matched'),
-    (Equal({1, 2, 3}), {1, 3, 5}, 'not_matched'),
+    (Match(10), -10, 'not_matched'),
+    (Match(0j), 1.e-100, 'not_matched'),
+    (Match(float("nan")), float("nan"), 'not_matched'),
+    (Match({1, 2, 3}), {1, 3, 5}, 'not_matched'),
+    (Match(math.pi, compare=math.isclose), 3.14159, 'not_matched'),
     (Range(min=7), 4, 'out_of_range'),
     (Range(max=-3), 7, 'out_of_range'),
     (Range(min=-12, max=-6), -24, 'out_of_range'),
@@ -115,6 +118,8 @@ def test_validator_setup_error(validator_constructor, exc_cls):
     (Predicate(lambda *, _: True), "hello again", TypeError),
     (Predicate(lambda x: x >= 0), "hello 123", TypeError),
     (Predicate(lambda x: x), "hello 456", TypeError),
+    (Match(math.pi, compare=math.isclose), "pqrs", TypeError),
+    (Match(math.pi, compare=lambda x, y: 'yes' if math.isclose(x, y) else ''), 3.141592653589, TypeError),
     (Range(min=-12, max=-6, absorb_cmp_error=False), "colony", TypeError),
     (Range(min=(1,), absorb_cmp_error=False), 2, TypeError),
     (Length(min=6, max=19, absorb_len_error=False), 12, TypeError),

@@ -20,7 +20,7 @@ __all__ = [
     'ValidationFailed',
     'BaseValidator',
     'Predicate',
-    'Equal',
+    'Match',
     'Range',
     'Length',
     'Regexp',
@@ -128,10 +128,10 @@ class Predicate(BaseValidator):
         return True
 
 
-@dataclass(order=False)
-class Equal(BaseValidator):
+@dataclass(init=False, order=False)
+class Match(BaseValidator):
     """
-    Checks whether a given value matches (i.e. is equal to) the given `target`.
+    Checks whether a given value matches the given `target`.
     """
     error_templates = {
         'not_matched': 'value not matching target {self.target!r}',
@@ -140,10 +140,26 @@ class Equal(BaseValidator):
     #: Target to compare the value against
     target: Any
 
+    #: Compare operation
+    compare: Callable[[Any, Any], bool]
+
+    #: Indicates whether non-boolean value returned from the post validation function
+    #: should be treated as :exc:`TypeError` instead
+    strict: bool
+
+    def __init__(self, target, compare: Callable[[Any, Any], bool] = operator.eq, strict: bool = True):
+        self.target = target
+        self.compare = compare
+        self.strict = strict
+
     def validate_sub(self, value) -> Literal[True]:
-        if value != self.target:
-            raise ValidationFailed(value, self, 'not_matched')
-        return True
+        result = self.compare(value, self.target)
+        if self.strict and not isinstance(result, bool):
+            raise TypeError(f"compare function must return boolean in strict mode "
+                            f"(but received {result!r})")
+        if result:
+            return True
+        raise ValidationFailed(value, self, 'not_matched')
 
 
 @dataclass(order=False)
