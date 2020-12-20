@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 import re
 
 import pytest  # noqa
 
-from bluejayson.validators import Equal, Length, Predicate, Range, Regexp, ValidationFailed
+from bluejayson.validators import Equal, InChoices, Length, Predicate, Range, Regexp, ValidationFailed
 
 
 @pytest.mark.parametrize("validator,value", [
@@ -35,9 +36,14 @@ from bluejayson.validators import Equal, Length, Predicate, Range, Regexp, Valid
     (Regexp(r'\w+|\d'), "0"),
     (Regexp(re.compile(r'\w+|\d')), "xyz"),
     (Regexp(re.compile(r'\w+|\d')), "7"),
-    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), "1234:567"),
-    (Regexp(re.compile(r'\w(\w*)\w'), validate_func=lambda s: s == "bcdef"), "abcdefg"),
-    (Regexp(r'(\w+)', validate_func=lambda x: x, strict=False), "foxes"),
+    (Regexp(r'(\d+):(\d+)', post_validate=lambda x, y: int(x) + int(y) == 1801), "1234:567"),
+    (Regexp(re.compile(r'\w(\w*)\w'), post_validate=lambda s: s == "bcdef"), "abcdefg"),
+    (Regexp(r'(\w+)', post_validate=lambda x: x, strict=False), "foxes"),
+    (InChoices(range(10)), 7),
+    (InChoices("aeiou"), "e"),
+    (InChoices([0, 3, 6, 9], compare=math.isclose), 3 + 1.e-12),
+    (InChoices([0, 3, 6, 9], compare=lambda x, y: '' if y == 0 else math.isclose(x, y), strict=False),
+     3 + 1.e-12),
 ])
 def test_validator_pass(validator, value):
     assert validator.validate(value)
@@ -72,9 +78,12 @@ def test_validator_pass(validator, value):
     (Regexp(r'\w+|\d'), "no more tests", 'not_matched'),
     (Regexp(re.compile(r'\w+|\d')), -789, 'not_string'),
     (Regexp(re.compile(r'\w+|\d')), "cool beans", 'not_matched'),
-    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), 1234567, 'not_string'),
-    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), "1234567", 'not_matched'),
-    (Regexp(r'(\d+):(\d+)', validate_func=lambda x, y: int(x) + int(y) == 1801), "123:4567", 'not_satisfied'),
+    (Regexp(r'(\d+):(\d+)', post_validate=lambda x, y: int(x) + int(y) == 1801), 1234567, 'not_string'),
+    (Regexp(r'(\d+):(\d+)', post_validate=lambda x, y: int(x) + int(y) == 1801), "1234567", 'not_matched'),
+    (Regexp(r'(\d+):(\d+)', post_validate=lambda x, y: int(x) + int(y) == 1801), "123:4567", 'not_satisfied'),
+    (InChoices([]), 1729, 'not_found'),
+    (InChoices("aeiou"), "ei", 'not_found'),
+    (InChoices([0, 3, 6, 9]), 3 + 1.e-12, 'not_found'),
 ])
 def test_validator_failed(validator, value, error_code):
     with pytest.raises(ValidationFailed) as exc_info:
@@ -93,6 +102,7 @@ def test_validator_failed(validator, value, error_code):
     (lambda: Length(max=20, equal=3), ValueError),
     (lambda: Regexp(1), TypeError),
     (lambda: Regexp('('), re.error),
+    (lambda: InChoices(10), TypeError),
 ])
 def test_validator_setup_error(validator_constructor, exc_cls):
     with pytest.raises(exc_cls):
@@ -108,9 +118,11 @@ def test_validator_setup_error(validator_constructor, exc_cls):
     (Range(min=-12, max=-6, absorb_cmp_error=False), "colony", TypeError),
     (Range(min=(1,), absorb_cmp_error=False), 2, TypeError),
     (Length(min=6, max=19, absorb_len_error=False), 12, TypeError),
-    (Regexp(r'(\w+)', validate_func="maybe"), 'cool', TypeError),
-    (Regexp(r'(\w+)', validate_func=lambda: True), 'cooler', TypeError),
-    (Regexp(r'(\w+)', validate_func=lambda _: "yes"), 'coolest', TypeError),
+    (Regexp(r'(\w+)', post_validate="maybe"), 'cool', TypeError),
+    (Regexp(r'(\w+)', post_validate=lambda: True), 'cooler', TypeError),
+    (Regexp(r'(\w+)', post_validate=lambda _: "yes"), 'coolest', TypeError),
+    (InChoices([0, 3, 6, 9], compare=lambda x, y: '' if y == 0 else math.isclose(x, y)),
+     3 + 1.e-12, TypeError),
 ])
 def test_validator_runtime_error(validator, value, exc_cls):
     with pytest.raises(exc_cls):

@@ -303,10 +303,10 @@ class Regexp(BaseValidator):
     strict: bool
 
     def __init__(self, pattern: Union[str, re.Pattern[str]],
-                 validate_func: Callable[[re.Match], bool] = None,
+                 post_validate: Callable[[re.Match], bool] = None,
                  strict: bool = True):
         self.pattern = self._compile_pattern(pattern)
-        self.post_validate = validate_func
+        self.post_validate = post_validate
         self.strict = strict
 
     @classmethod
