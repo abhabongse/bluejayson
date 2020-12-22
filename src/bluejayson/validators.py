@@ -1,5 +1,5 @@
 """
-Collection of data validators.
+Collection of data validator classes.
 
 Many of these validators are heavily inspired by those from marshmallow.
 https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
@@ -16,6 +16,8 @@ from typing import Any, ClassVar, Union
 
 from typing_extensions import Literal
 
+from bluejayson.exceptions import BlueJaysonError
+
 __all__ = [
     'ValidationFailed',
     'BaseValidator',
@@ -28,7 +30,7 @@ __all__ = [
 ]
 
 
-class ValidationFailed(Exception):
+class ValidationFailed(BlueJaysonError):
     """
     This exception is raised when a validator determines that
     a given value should be considered invalid data.
@@ -87,7 +89,7 @@ class BaseValidator(metaclass=ABCMeta):
             result = self.validate_sub(value)
         except ValidationFailed:
             raise
-        if result is not True:
+        if result is not True:  # pragma: no cover
             raise RuntimeError(f"validate_sub should have returned either True "
                                f"or raise ValidationFailure (but received {result!r})")
         return True
