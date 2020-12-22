@@ -7,10 +7,8 @@ import datetime as dt
 from collections.abc import Callable
 from typing import Any
 
-CoerceFunc = Callable[[Any], Any]
 
-
-def parse_boolean_flag(value: Any) -> bool:
+def coerce_boolean_flag(value: Any) -> bool:
     """
     Converts a given value into a boolean.
     These values are recognized as True: '1', 'y', 'yes', 'true', 'on';
@@ -24,11 +22,14 @@ def parse_boolean_flag(value: Any) -> bool:
             return True
         if value in ['0', 'n', 'no', 'false', 'off']:
             return False
-    raise ValueError(f"cannot convert given value flag to boolean: {value!r}")
+        raise ValueError(f"cannot convert given value flag to boolean: {value!r}")
+    raise TypeError(f"cannot convert given value flag to boolean: {value!r}")
 
 
-DEFAULT_COERCE_FUNCS: dict[type, CoerceFunc] = {
+DEFAULT_COERCE_FUNCS: dict[type, Callable] = {
     dt.datetime: dt.datetime.fromisoformat,
     dt.date: dt.date.fromisoformat,
-    bool: parse_boolean_flag,
+    dt.time: dt.time.fromisoformat,
+    bool: coerce_boolean_flag,
+    # TODO: add more data coercion functions for parametric types
 }

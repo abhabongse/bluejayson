@@ -3,15 +3,16 @@ Main definition of data field class.
 """
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Annotated, Any, Optional, Union, get_args, get_origin, get_type_hints
+from typing import Any, Optional, Union
+
+from typing_extensions import Annotated, Literal, get_args, get_origin, get_type_hints
 
 from bluejayson.coercions import DEFAULT_COERCE_FUNCS
 from bluejayson.exceptions import BlueJaysonError
 from bluejayson.validators import BaseValidator
-
-CoerceFunc = Callable[[Any], Any]
 
 
 @dataclass(init=False, repr=False, order=False)
@@ -21,9 +22,9 @@ class FieldFactory:
     with a pre-specified underlying configuration,
     such as a default set of type coercion functions when a field needs it.
     """
-    coerce_funcs: dict[type, CoerceFunc]
+    coerce_funcs: dict[type, Callable]
 
-    def __init__(self, extra_coerce_funcs: dict[type, CoerceFunc] = None):
+    def __init__(self, extra_coerce_funcs: dict[type, Callable] = None):
         self.coerce_funcs = DEFAULT_COERCE_FUNCS | (extra_coerce_funcs or {})
 
     def field(self, *args, **kwargs) -> Field:
@@ -32,14 +33,21 @@ class FieldFactory:
         """
         return Field(*args, factory=self, **kwargs)
 
-    def resolve_coerce_func(self, dtype: type, specifier: Union[CoerceFunc, bool]) -> Optional[CoerceFunc]:
+    def resolve_coerce_func(
+            self, dtype: type,
+            specifier: Union[Literal['auto'], bool, Callable],
+    ) -> Optional[Callable]:
         """
         Obtain the resolved type coercion function based on the target `dtype`
         and the coercion `specifier` given to the :cls:`Field` constructor.
         """
+        if specifier == 'auto':
+            # Do not coerce to type if type is abstract
+            specifier = not inspect.isabstract(dtype)
         if specifier is True:
             if not isinstance(dtype, type):
                 raise TypeError(f"dtype required as type but received {dtype}")
+            dtype = get_origin(dtype) or dtype
             return self.coerce_funcs.get(dtype, dtype)
         if specifier is False:
             return None
@@ -60,12 +68,12 @@ class Field:
     attr_name: Optional[str]
     dtype: type
     extra_annotations: tuple
-    coerce: Union[bool, CoerceFunc]
+    coerce: Union[bool, Callable]
     factory: FieldFactory
 
     def __init__(self, dtype: type = None,
                  *extra_annotations,
-                 coerce: Union[bool, CoerceFunc] = True,
+                 coerce: Union[Literal['auto'], bool, Callable] = 'auto',
                  factory: FieldFactory = DEFAULT_FIELD_FACTORY):
         self.attr_name = None
         self.dtype = dtype
@@ -102,7 +110,10 @@ class Field:
         coerce_func = self.factory.resolve_coerce_func(self.dtype, self.coerce)
         if coerce_func:
             original_value = value
-            value = coerce_func(value)
+            if get_origin(self.dtype):
+                value = coerce_func(value, get_args(self.dtype))
+            else:
+                value = coerce_func(value)
             if not isinstance(value, self.dtype):
                 raise BlueJaysonError(f"failed to coerce input value to type {self.dtype.__qualname__} "
                                       f"(received {original_value!r})")
