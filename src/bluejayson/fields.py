@@ -1,5 +1,9 @@
 """
 Main definition of data field class.
+
+TODO: consider the following type annotation which indicates
+      a list of at most 10 floating points numbers inclusively between 0 and 1
+            Annotated[list[Annotated[float, Range(min=0, max=99)]], Length(max=10)]
 """
 from __future__ import annotations
 
@@ -10,7 +14,7 @@ from typing import Any, Optional, Union
 
 from typing_extensions import Annotated, Literal, get_args, get_origin, get_type_hints
 
-from bluejayson.coercions import DEFAULT_COERCE_FUNCS
+from bluejayson.coercion import DEFAULT_COERCE_FUNCS
 from bluejayson.exceptions import BlueJaysonError
 from bluejayson.validators import BaseValidator
 
@@ -22,6 +26,7 @@ class FieldFactory:
     with a pre-specified underlying configuration,
     such as a default set of type coercion functions when a field needs it.
     """
+    # TODO: factory should be able to handle both type coercion and type validation, separately
     coerce_funcs: dict[type, Callable]
 
     def __init__(self, extra_coerce_funcs: dict[type, Callable] = None):
@@ -70,6 +75,9 @@ class Field:
     extra_annotations: tuple
     coerce: Union[bool, Callable]
     factory: FieldFactory
+
+    # TODO: change API to no longer accept extra annotations as varargs
+    #       (see note at the module docstring)
 
     def __init__(self, dtype: type = None,
                  *extra_annotations,

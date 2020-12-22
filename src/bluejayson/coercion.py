@@ -1,5 +1,6 @@
 """
-Collection of default coercion functions.
+Collection of data sanitization functions, each combining these sub-steps:
+(1) type coercion, (2) type validation, and (3) other annotated validations.
 """
 from __future__ import annotations
 
