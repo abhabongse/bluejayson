@@ -10,7 +10,7 @@ import os
 __all__ = []
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-metadata_file = os.path.join(this_dir, 'meta.json')
+metadata_file = os.path.join(this_dir, 'package-info.json')
 
 try:
     with open(metadata_file) as fobj:

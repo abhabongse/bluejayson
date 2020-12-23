@@ -13,7 +13,7 @@ def read(*names, **kwargs):
         return fh.read()
 
 
-_METADATA = json.loads(read(join('src', 'bluejayson', 'meta.json')))
+_METADATA = json.loads(read(join('src', 'bluejayson', 'package-info.json')))
 
 setup(
     name='bluejayson',
