@@ -1,7 +1,7 @@
 """
-Collection of custom data validator classes.
+Collection of data validator classes.
 
-Note: many of these validators are heavily inspired by those from marshmallow.
+Note: many of these validations are heavily inspired by those from marshmallow.
 https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
 """
 from __future__ import annotations
@@ -44,10 +44,10 @@ class ValidationFailed(BlueJaysonError):
 
 class BaseValidator(metaclass=ABCMeta):
     """
-    Base validator class for all kinds of validations.
+    Base validator class for all kinds of data validations.
     """
     # TODO: implements boolean-like operators (NOT, AND, OR, XOR)
-    #       to combine multiple sub-validators
+    #       to combine multiple sub-validations
 
     #: Maintains a mapping from error codes (specific to each validator)
     #: to error message templates as {}-formatted strings
