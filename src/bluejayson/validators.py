@@ -1,5 +1,5 @@
 """
-Collection of data validator classes.
+Validator classes for data fields.
 
 Note: many of these validations are heavily inspired by those from marshmallow.
 https://marshmallow.readthedocs.io/en/stable/marshmallow.validate.html
@@ -17,6 +17,11 @@ from typing import Any, ClassVar, Union
 from typing_extensions import Literal
 
 from bluejayson.exceptions import BlueJaysonError
+
+__all__ = [
+    'ValidationFailed', 'BaseValidator',
+    'Predicate', 'Match', 'Range', 'Length', 'Regexp', 'InChoices',
+]
 
 
 class ValidationFailed(BlueJaysonError):
@@ -54,44 +59,30 @@ class BaseValidator(metaclass=ABCMeta):
     error_templates: ClassVar[dict[str, str]] = {}
 
     @abstractmethod
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         """
         Checks whether an input value should be considered valid data.
-        This method should return `True` upon the completed and successful check
-        or otherwise raises :exc:`ValidationFailed` if the value considered invalid.
+        This method typically returns the input value as-is upon the completed and successful check.
+        It may also opt to sanitize (i.e. modify) the input value before it is returned.
+        Otherwise, this method raises :exc:`ValidationFailed` if the value is considered invalid.
 
-        Other kinds of exceptions raised from this method
-        should be treated as one of the following:
+        Other kinds of exceptions raised from this method should be treated as one of the following:
         - a validator implementation bug (library's fault)
         - a bug due to improper validator setup (caller's fault)
-
-        This method is intended to be called as a subroutine by :meth:`validate` method
-        (or as a callable) and thus should **not** be called directly.
         """
         raise NotImplementedError
 
-    def validate(self, value) -> bool:
-        """
-        Checks whether an input value through a subroutine call to :meth:`validate_sub`.
-        """
-        try:
-            result = self.validate_sub(value)
-        except ValidationFailed:
-            raise
-        if result is not True:  # pragma: no cover
-            raise RuntimeError(f"validate_sub should have returned either True "
-                               f"or raise ValidationFailure (but received {result!r})")
-        return True
-
     def __call__(self, value) -> bool:
         """
-        Alias method for :meth:`validate` method but converts :exc:`ValidationFailure`
-        into returning `False` instead.
+        Alias method for :meth:`validate` method but returns `True` for passing value
+        and converts :exc:`ValidationFailure`into returning `False` instead.
         """
         try:
-            return self.validate(value)
+            self.validate(value)
         except ValidationFailed:
             return False
+        else:
+            return True
 
 
 @dataclass(order=False)
@@ -110,13 +101,13 @@ class Predicate(BaseValidator):
     #: should be treated as :exc:`TypeError` instead
     strict: bool = True
 
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         result = self.pred(value)
         if self.strict and not isinstance(result, bool):
             raise TypeError(f"predicate must return boolean in strict mode (but received {result!r})")
         if not result:
             raise ValidationFailed(value, self, 'not_satisfied')
-        return True
+        return value
 
 
 @dataclass(init=False, order=False)
@@ -143,14 +134,14 @@ class Match(BaseValidator):
         self.compare = compare
         self.strict = strict
 
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         result = self.compare(value, self.target)
         if self.strict and not isinstance(result, bool):
             raise TypeError(f"compare function must return boolean in strict mode "
                             f"(but received {result!r})")
-        if result:
-            return True
-        raise ValidationFailed(value, self, 'not_matched')
+        if not result:
+            raise ValidationFailed(value, self, 'not_matched')
+        return value
 
 
 @dataclass(order=False)
@@ -185,7 +176,7 @@ class Range(BaseValidator):
         if not isinstance(self.max_inclusive, bool):
             raise TypeError(f"max_inclusive flag must be a boolean (but received {self.max_inclusive!r})")
 
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         try:
             result = self._compare_lower(value) and self._compare_upper(value)
         except TypeError as exc:
@@ -194,7 +185,7 @@ class Range(BaseValidator):
             raise
         if not result:
             raise ValidationFailed(value, self, 'out_of_range')
-        return True
+        return value
 
     def _compare_lower(self, value) -> bool:
         return self.min is None or (value >= self.min if self.min_inclusive else value > self.min)
@@ -250,7 +241,7 @@ class Length(BaseValidator):
             if not isinstance(self.equal, int):
                 raise TypeError(f"equal should be int if provided (but received {self.equal!r})")
 
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         try:
             length = len(value)
         except TypeError as exc:
@@ -262,7 +253,7 @@ class Length(BaseValidator):
                   and self._compare_upper(length))
         if not result:
             raise ValidationFailed(value, self, 'length_out_of_range')
-        return True
+        return value
 
     def _compare_lower(self, length: int) -> bool:
         return self.min is None or self.min <= length
@@ -324,7 +315,7 @@ class Regexp(BaseValidator):
             return re.compile(pattern)
         raise TypeError(f"regexp pattern should be a string or a compiled pattern (but received {pattern!r}")
 
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         if not isinstance(value, str):
             raise ValidationFailed(value, self, 'not_string')
         matchobj = self.pattern.fullmatch(value)
@@ -337,7 +328,7 @@ class Regexp(BaseValidator):
                                 f"(but received {result!r})")
             if not result:
                 raise ValidationFailed(value, self, 'not_satisfied')
-        return True
+        return value
 
 
 @dataclass(init=False, order=False)
@@ -366,14 +357,14 @@ class InChoices(BaseValidator):
         self.compare = compare
         self.strict = strict
 
-    def validate_sub(self, value) -> Literal[True]:
+    def validate(self, value) -> Literal[True]:
         for choice in self.choices:
             result = self.compare(value, choice)
             if self.strict and not isinstance(result, bool):
                 raise TypeError(f"compare function must return boolean in strict mode "
                                 f"(but received {result!r})")
             if result:
-                return True
+                return value
         raise ValidationFailed(value, self, 'not_found')
 
 # TODO: implements Sequence validator which wraps over sub-validator for homogeneous sequence

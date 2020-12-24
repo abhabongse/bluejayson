@@ -48,7 +48,7 @@ from bluejayson.validators import InChoices, Length, Match, Predicate, Range, Re
      3 + 1.e-12),
 ])
 def test_validator_pass(validator, value):
-    assert validator.validate(value)
+    assert validator.validate(value) == value
     assert validator(value)
 
 
