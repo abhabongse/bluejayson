@@ -96,6 +96,8 @@ def test_validator_failed(validator, value, error_code):
 
 
 @pytest.mark.parametrize("validator_constructor,exc_cls", [
+    (lambda: Predicate(1), TypeError),
+    (lambda: Match('1', compare='2'), TypeError),
     (lambda: Range(min=0, min_inclusive=1), TypeError),
     (lambda: Range(max=100, max_inclusive=0), TypeError),
     (lambda: Length(min=(5, 10)), TypeError),
@@ -105,7 +107,9 @@ def test_validator_failed(validator, value, error_code):
     (lambda: Length(max=20, equal=3), ValueError),
     (lambda: Regexp(1), TypeError),
     (lambda: Regexp('('), re.error),
+    (lambda: Regexp(r'(\w+)', post_validate="maybe"), TypeError),
     (lambda: InChoices(10), TypeError),
+    (lambda: InChoices([], compare=''), TypeError),
 ])
 def test_validator_setup_error(validator_constructor, exc_cls):
     with pytest.raises(exc_cls):
@@ -123,9 +127,9 @@ def test_validator_setup_error(validator_constructor, exc_cls):
     (Range(min=-12, max=-6, absorb_cmp_error=False), "colony", TypeError),
     (Range(min=(1,), absorb_cmp_error=False), 2, TypeError),
     (Length(min=6, max=19, absorb_len_error=False), 12, TypeError),
-    (Regexp(r'(\w+)', post_validate="maybe"), 'cool', TypeError),
     (Regexp(r'(\w+)', post_validate=lambda: True), 'cooler', TypeError),
     (Regexp(r'(\w+)', post_validate=lambda _: "yes"), 'coolest', TypeError),
+    (InChoices([0, 3, 6, 9], compare=lambda _: True), 3 + 1.e-12, TypeError),
     (InChoices([0, 3, 6, 9], compare=lambda x, y: '' if y == 0 else math.isclose(x, y)),
      3 + 1.e-12, TypeError),
 ])

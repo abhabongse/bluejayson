@@ -17,6 +17,7 @@ from typing import Any, ClassVar, Union
 from typing_extensions import Literal
 
 from bluejayson.exceptions import BlueJaysonError
+from bluejayson.utils import prepare_repr
 
 __all__ = [
     'ValidationFailed', 'BaseValidator',
@@ -47,6 +48,7 @@ class ValidationFailed(BlueJaysonError):
                 .format(value=self.value, self=self.validator))
 
 
+@dataclass
 class BaseValidator(metaclass=ABCMeta):
     """
     Base validator class for all kinds of data validations.
@@ -59,7 +61,7 @@ class BaseValidator(metaclass=ABCMeta):
     error_templates: ClassVar[dict[str, str]] = {}
 
     @abstractmethod
-    def validate(self, value) -> Literal[True]:
+    def validate(self, value):
         """
         Checks whether an input value should be considered valid data.
         This method typically returns the input value as-is upon the completed and successful check.
@@ -85,7 +87,7 @@ class BaseValidator(metaclass=ABCMeta):
             return True
 
 
-@dataclass(order=False)
+@dataclass(eq=False)
 class Predicate(BaseValidator):
     """
     Wraps over a custom predicate (boolean) function.
@@ -101,6 +103,10 @@ class Predicate(BaseValidator):
     #: should be treated as :exc:`TypeError` instead
     strict: bool = True
 
+    def __post_init__(self):
+        if not callable(self.pred):
+            raise TypeError(f"predicate must be callable (but received {self.pred!r}")
+
     def validate(self, value) -> Literal[True]:
         result = self.pred(value)
         if self.strict and not isinstance(result, bool):
@@ -110,7 +116,7 @@ class Predicate(BaseValidator):
         return value
 
 
-@dataclass(init=False, order=False)
+@dataclass(eq=False)
 class Match(BaseValidator):
     """
     Checks whether a given value matches the given `target`.
@@ -123,18 +129,17 @@ class Match(BaseValidator):
     target: Any
 
     #: Compare operation
-    compare: Callable[[Any, Any], bool]
+    compare: Callable[[Any, Any], bool] = operator.eq
 
     #: Indicates whether non-boolean value returned from the post validation function
     #: should be treated as :exc:`TypeError` instead
-    strict: bool
+    strict: bool = True
 
-    def __init__(self, target, compare: Callable[[Any, Any], bool] = operator.eq, strict: bool = True):
-        self.target = target
-        self.compare = compare
-        self.strict = strict
+    def __post_init__(self):
+        if not callable(self.compare):
+            raise TypeError(f"compare function must be callable (but received {self.compare!r}")
 
-    def validate(self, value) -> Literal[True]:
+    def validate(self, value):
         result = self.compare(value, self.target)
         if self.strict and not isinstance(result, bool):
             raise TypeError(f"compare function must return boolean in strict mode "
@@ -144,7 +149,7 @@ class Match(BaseValidator):
         return value
 
 
-@dataclass(order=False)
+@dataclass(repr=False, eq=False)
 class Range(BaseValidator):
     """
     Checks whether a given value falls within a defined bounded range.
@@ -176,7 +181,20 @@ class Range(BaseValidator):
         if not isinstance(self.max_inclusive, bool):
             raise TypeError(f"max_inclusive flag must be a boolean (but received {self.max_inclusive!r})")
 
-    def validate(self, value) -> Literal[True]:
+    def __repr__(self):
+        fields = {}
+        if self.min is not None:
+            fields['min'] = self.min
+        if self.max is not None:
+            fields['max'] = self.max
+        if self.min is not None:
+            fields['min_inclusive'] = self.min_inclusive
+        if self.max is not None:
+            fields['max_inclusive'] = self.max_inclusive
+        fields['absorb_cmp_error'] = self.absorb_cmp_error
+        return prepare_repr(type(self).__name__, fields)
+
+    def validate(self, value):
         try:
             result = self._compare_lower(value) and self._compare_upper(value)
         except TypeError as exc:
@@ -205,7 +223,7 @@ class Range(BaseValidator):
         return statement
 
 
-@dataclass(order=False)
+@dataclass(repr=False, eq=False)
 class Length(BaseValidator):
     """
     Checks whether a given value has the length adhering to the specified bounded range.
@@ -241,7 +259,19 @@ class Length(BaseValidator):
             if not isinstance(self.equal, int):
                 raise TypeError(f"equal should be int if provided (but received {self.equal!r})")
 
-    def validate(self, value) -> Literal[True]:
+    def __repr__(self):
+        fields = {}
+        if self.equal is not None:
+            fields['equal'] = self.equal
+        else:
+            if self.min is not None:
+                fields['min'] = self.min
+            if self.max is not None:
+                fields['max'] = self.max
+        fields['absorb_len_error'] = self.absorb_len_error
+        return prepare_repr(type(self).__name__, fields)
+
+    def validate(self, value):
         try:
             length = len(value)
         except TypeError as exc:
@@ -274,7 +304,7 @@ class Length(BaseValidator):
         return statement
 
 
-@dataclass(init=False, order=False)
+@dataclass(init=False, eq=False)
 class Regexp(BaseValidator):
     """
     Checks whether a given string value fully matches the given regular expression.
@@ -286,7 +316,7 @@ class Regexp(BaseValidator):
     }
 
     #: Input regular expression pattern
-    pattern: Union[str, re.Pattern[str]]
+    pattern: re.Pattern[str]
 
     #: Post validate function based on match object
     post_validate: Callable[..., bool]
@@ -304,18 +334,20 @@ class Regexp(BaseValidator):
                  post_validate: Callable[[re.Match], bool] = None,
                  strict: bool = True):
         self.pattern = self._compile_pattern(pattern)
+        if post_validate is not None and not callable(post_validate):
+            raise TypeError(f"post validate function must be callable (but received {post_validate!r}")
         self.post_validate = post_validate
         self.strict = strict
 
     @classmethod
-    def _compile_pattern(cls, pattern: Union[str, re.Pattern[str]]):
+    def _compile_pattern(cls, pattern: Union[str, re.Pattern[str]]) -> re.Pattern:
         if isinstance(pattern, re.Pattern):
             return pattern
         if isinstance(pattern, str):
             return re.compile(pattern)
         raise TypeError(f"regexp pattern should be a string or a compiled pattern (but received {pattern!r}")
 
-    def validate(self, value) -> Literal[True]:
+    def validate(self, value):
         if not isinstance(value, str):
             raise ValidationFailed(value, self, 'not_string')
         matchobj = self.pattern.fullmatch(value)
@@ -331,7 +363,7 @@ class Regexp(BaseValidator):
         return value
 
 
-@dataclass(init=False, order=False)
+@dataclass(init=False, eq=False)
 class InChoices(BaseValidator):
     """
     Checks whether a given value is one among the pre-defined choices.
@@ -354,10 +386,12 @@ class InChoices(BaseValidator):
                  compare: Callable[[Any, Any], bool] = operator.eq,
                  strict: bool = True):
         self.choices = list(choices)
+        if not callable(compare):
+            raise TypeError(f"compare function must be callable (but received {compare!r}")
         self.compare = compare
         self.strict = strict
 
-    def validate(self, value) -> Literal[True]:
+    def validate(self, value):
         for choice in self.choices:
             result = self.compare(value, choice)
             if self.strict and not isinstance(result, bool):
